@@ -48,6 +48,8 @@ typedef struct{
 //  */
 // RUDP_Socket *rudp_socket(bool isServer, unsigned int port);
 
+// Creating the socket, return -1 if fails
+int rudp_socket();
 
 /**
  * @brief Sends data stored in the buffer to the other side.
