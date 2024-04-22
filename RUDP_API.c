@@ -206,7 +206,7 @@ int rudp_receive(int socket, char **buffer, int *size) {
     return 0;  // No data received or unexpected packet type
 }
 
-int rudp_connect(int socket, const char *ip, int port) {
+int rudp_connect(int socket, const char *ip,unsigned short int port) {
     // Set timeout for the socket
     if (set_time(socket, 1) == -1) {
         return -1;
@@ -283,3 +283,94 @@ int rudp_connect(int socket, const char *ip, int port) {
     free(recv);
     return 0; // Connection attempt failed
 }
+// unsigned short int checksum(RUDP_Packet *rudp) {
+//   int sum = 0;
+//   for (int i = 0; i < 10 && i < MAX_SIZE; i++) {
+//     sum += rudp->data[i];
+//   }
+//   return sum;
+// }
+
+unsigned short int calculate_checksum(RUDP_Packet *rudp) {
+    unsigned int sum = 0;
+    unsigned short *buf = (unsigned short *)rudp;
+    unsigned short checksum;
+
+    // Calculate the sum of all 16-bit words
+    for (int i = 0; i < sizeof(RUDP_Packet) / 2; i++) {
+        sum += *buf++;
+    }
+
+    // Add carry bits to the sum
+    while (sum >> 16) {
+        sum = (sum & 0xFFFF) + (sum >> 16);
+    }
+
+    // Take the one's complement
+    checksum = ~sum;
+
+    return checksum;
+}
+int send_ack(int sockfd, RUDP_Packet *received_packet){
+  // Allocate memory for the acknowledgment packet
+    RUDP_Packet *ack_packet = malloc(sizeof(RUDP_Packet));
+    if (ack_packet == NULL) {
+        perror("Failed to allocate memory for acknowledgment packet");
+        return -1;  // Error occurred
+    }
+  // Initialize acknowledgment packet flags
+    if (received_packet->flags.isData == 1) {
+        ack_packet->flags.isData = 1;  // Indicates a data packet
+    }
+  // Set acknowledgment packet flags based on the received RUDP packet
+    if (received_packet->flags.fin == 1) {
+        ack_packet->flags.fin = 1;  // Indicates completion of data transmission
+    }
+   // Set the sequence number and calculate the checksum
+    ack_packet->sequalNum = received_packet->sequalNum;
+    ack_packet->checksum = calculate_checksum(ack_packet);
+
+    // Transmit the acknowledgment packet
+    int send_result = sendto(socket, ack_packet, sizeof(RUDP_Packet), 0, NULL, 0);
+    if (send_result == -1) {
+        perror("Error: transmit acknowledgment is faild");
+        free(ack_packet);
+        return -1;  // Transmission error
+    }
+
+    // Free memory allocated for the acknowledgment packet
+    free(ack_packet);
+
+    // Return success
+    return 1;  
+}
+ss
+int wait_ack(int sockfd, int seq_num, clock_t st ,clock_t tout){
+    // Allocate memory for the acknowledgment packet
+RUDP_Packet *ack_packet = malloc(sizeof(RUDP_Packet));
+if (ack_packet == NULL) {
+    perror("Failed to allocate memory for acknowledgment packet");
+    return -1;  // Error occurred
+}
+// Loop until timeout
+clock_t elapsed_time = clock() - st;
+double elapsed_seconds = (double)elapsed_time / CLOCKS_PER_SEC;
+while (elapsed_seconds < 1) {
+  // Receive packet from the socket
+  int length = recvfrom(sockfd, ack_packet, sizeof(RUDP_Packet) - 1, 0, NULL, 0); 
+   if (length == -1) {
+            free(ack_packet);
+            return -1;  // Error occurred
+        } 
+ // Check if the received packet matches the expected sequence number and is an acknowledgment
+  if (ack_packet->sequalNum == seq_num && ack_packet->flags.ack == 1) {
+            free(ack_packet);
+            return 1;  // Acknowledgment received
+        }        
+}
+ free(ack_packet);
+    return 0;  // Timeout reached without acknowledgment
+}
+
+
+
