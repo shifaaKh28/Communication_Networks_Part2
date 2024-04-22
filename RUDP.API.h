@@ -86,7 +86,7 @@ int rudp_close(RUDP_Socket *sockfd);
  * @param dest_port Destination port number.
  * @return 1 on success, 0 on failure.
  */
-int rudp_connect(RUDP_Socket *sockfd, const char *dest_ip, unsigned short int dest_port);
+int rudp_connect(RUDP_Socket *sockfd, char *dest_ip, unsigned short int dest_port);
 
 /**
  * @brief Disconnects from an actively connected socket.
