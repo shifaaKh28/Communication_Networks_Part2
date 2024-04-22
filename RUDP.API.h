@@ -45,8 +45,8 @@ typedef struct{
  * @param isServer Indicates if the socket is acting as a server (true) or client (false).
  * @param listen_port The port number to bind the socket to (for server only).
  * @return A pointer to the newly created RUDP socket structure.
- */
-RUDP_Socket *rudp_socket(bool isServer, unsigned int port);
+//  */
+// RUDP_Socket *rudp_socket(bool isServer, unsigned int port);
 
 
 /**
