@@ -85,25 +85,15 @@ typedef enum {
 //     return sockfd;
 // }
 
-RUDP_Socket *rudp_socket() {
-    // Allocate memory for the socket structure
-    RUDP_Socket *sockfd = malloc(sizeof(RUDP_Socket));
-    if (!sockfd) {
-        perror("malloc(3)");
-        return NULL;
+int rudp_socket() 
+{
+    int sock = socket(AF_INET, SOCK_DGRAM, 0);
+    if (sock == -1) 
+    {
+        perror("Error creating RUDP socket");
+        return -1;
     }
-
-    // Create the UDP socket
-    sockfd->socket_fd = socket(AF_INET, SOCK_DGRAM, 0);
-    if (sockfd->socket_fd < 0) {
-        perror("socket(2)");
-        free(sockfd);
-        return NULL;
-    }
-
-    sockfd->isConnected = false;
-
-    return sockfd;
+    return sock;
 }
 
 unsigned short int calculate_checksum(void *data, unsigned int bytes) {
