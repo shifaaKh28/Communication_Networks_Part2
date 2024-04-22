@@ -333,7 +333,7 @@ int send_ack(int sockfd, RUDP_Packet *received_packet){
     // Transmit the acknowledgment packet
     int send_result = sendto(socket, ack_packet, sizeof(RUDP_Packet), 0, NULL, 0);
     if (send_result == -1) {
-        perror("Error: transmit acknowledgment is faild");
+        perror("Error: transmit acknowledgment");
         free(ack_packet);
         return -1;  // Transmission error
     }
@@ -344,33 +344,41 @@ int send_ack(int sockfd, RUDP_Packet *received_packet){
     // Return success
     return 1;  
 }
-ss
-int wait_ack(int sockfd, int seq_num, clock_t st ,clock_t tout){
+
+int wait_ack(int sockfd, int seq_num, clock_t st, clock_t tout) {
     // Allocate memory for the acknowledgment packet
-RUDP_Packet *ack_packet = malloc(sizeof(RUDP_Packet));
-if (ack_packet == NULL) {
-    perror("Failed to allocate memory for acknowledgment packet");
-    return -1;  // Error occurred
-}
-// Loop until timeout
-clock_t elapsed_time = clock() - st;
-double elapsed_seconds = (double)elapsed_time / CLOCKS_PER_SEC;
-while (elapsed_seconds < 1) {
-  // Receive packet from the socket
-  int length = recvfrom(sockfd, ack_packet, sizeof(RUDP_Packet) - 1, 0, NULL, 0); 
-   if (length == -1) {
+    RUDP_Packet *ack_packet = malloc(sizeof(RUDP_Packet));
+    if (ack_packet == NULL) {
+        perror("Failed to allocate memory for acknowledgment packet");
+        return -1;  // Error occurred
+    }
+
+    // Loop until timeout
+    clock_t elapsed_time;
+    double elapsed_seconds;
+    do {
+        elapsed_time = clock() - st;
+        elapsed_seconds = (double)elapsed_time / CLOCKS_PER_SEC;
+
+        // Receive packet from the socket
+        int length = recvfrom(sockfd, ack_packet, sizeof(RUDP_Packet), 0, NULL, 0);
+        if (length == -1) {
+            perror("Failed to receive acknowledgment packet");
             free(ack_packet);
             return -1;  // Error occurred
-        } 
- // Check if the received packet matches the expected sequence number and is an acknowledgment
-  if (ack_packet->sequalNum == seq_num && ack_packet->flags.ack == 1) {
+        }
+
+        // Check if the received packet matches the expected sequence number and is an acknowledgment
+        if (ack_packet->sequalNum == seq_num && ack_packet->flags.ack == 1) {
             free(ack_packet);
             return 1;  // Acknowledgment received
-        }        
-}
- free(ack_packet);
+        }
+    } while (elapsed_seconds < tout);
+
+    free(ack_packet);
     return 0;  // Timeout reached without acknowledgment
 }
+
 
 
 
