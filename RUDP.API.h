@@ -28,7 +28,6 @@ typedef struct RUDP_Packet {
     char data[MAX_SIZE]; // Data payload
 } RUDP_Packet;
 
-// Function prototypes:
 
 /**
  * @brief Creates a new RUDP socket.
@@ -71,12 +70,11 @@ int rudp_close(int sockfd);
 int rudp_connect(int socket, const char *ip, int port);
 
 /**
- * @brief Calculates the checksum for a given data buffer.
- * @param data Pointer to the data buffer.
- * @param bytes Number of bytes in the data buffer.
- * @return The calculated checksum.
- */
-unsigned short int calculate_checksum(void *data, unsigned int bytes);
+* @brief Calculates the checksum for the given RUDP packet.
+*@param rudp Pointer to the RUDP packet for which the checksum is calculated.
+*@return The checksum value as an unsigned short integer.
+*/
+unsigned short int calculate_checksum(RUDP_Packet *rudp);
 
 /**
  * @brief Waits for acknowledgment from the receiver.
@@ -104,4 +102,11 @@ int send_ack(int socket, RUDP_Packet *rudp);
  */
 int set_time(int socket, int time);
 
+/**
+ * @brief Gets the connection status of a given UDP socket on a specified port.
+ * @param socket The UDP socket file descriptor.
+ * @param port The port number to check the connection status.
+ * @return True if the socket is connected to the specified port, false otherwise.
+ */
+int rudp_get_con(int socket, int port);
 #endif /* RUDP_API_H */
