@@ -36,6 +36,14 @@ typedef struct RUDP_Packet {
 int rudp_socket();
 
 /**
+ * @brief Waits for an incoming connection request on the specified RUDP socket.
+ * @param socket The file descriptor of the RUDP socket.
+ * @param port The port number to listen on for incoming connections.
+ * @return 1 on successful connection, -1 on failure.
+ */
+int rudp_accept(int socket, int port);
+
+/**
  * @brief Sends data over the RUDP connection.
  * @param sockfd File descriptor of the RUDP socket.
  * @param data Pointer to the data to be sent.
@@ -102,11 +110,5 @@ int send_ack(int socket, RUDP_Packet *rudp);
  */
 int set_time(int socket, int time);
 
-/**
- * @brief Gets the connection status of a given UDP socket on a specified port.
- * @param socket The UDP socket file descriptor.
- * @param port The port number to check the connection status.
- * @return True if the socket is connected to the specified port, false otherwise.
- */
-int rudp_get_con(int socket, int port);
+
 #endif /* RUDP_API_H */
