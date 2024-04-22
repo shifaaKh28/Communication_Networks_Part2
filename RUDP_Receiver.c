@@ -1,70 +1,150 @@
+#include <arpa/inet.h>  // For the in_addr structure and the inet_pton function
+#include <stdbool.h>    // For the boolean signs flags
 #include <stdio.h>
 #include <stdlib.h>
-#include <sys/time.h>
-#include "RUDP.API.h"
+#include <string.h>      // For the memset function
+#include <sys/socket.h>  // For the socket function
+#include <sys/time.h>    // For tv struct
+#include <time.h>
+#include <unistd.h>  // For the close function
 
-#define FILE_SIZE 2097152 // 2 MB
+#include "RUDP_API.h"
+
+#define PORT 5061  // may be changed, temporary port for now
+
+#define SIZE_DATA 2097152  // need to be changed to 2mb
+
+/***Will act as an server***/
 
 int main(int argc, char *argv[]) {
-    // Check command line arguments
-    if (argc != 3 || strcmp(argv[1], "-p") != 0) {
-        fprintf(stderr, "Usage: %s -p <port>\n", argv[0]);
-        return 1;
+  // Checking if the command is right
+  if (argc != 3 || strcmp(argv[1], "-p") != 0) {
+    printf("Incorrect command input\n");
+  }
+
+  printf("Start receiver\n");
+  int port = atoi(argv[2]);  // according to the format it's supposed to have
+                             // there the port number
+
+  int socket = rudp_socket();
+  if (socket == -1) {
+    printf("Socket couldn't be created\n");
+    return -1;
+  }
+
+  printf("Socket has been created succeesfuly!\n");
+  printf("waitnig for RUDP connection...\n");
+
+  int receive_state = rudp_accept(socket, port);  // getting the connection
+
+  if (receive_state == 0) {
+    printf("Couldn't get a connection\n");
+    return -1;
+  }
+
+  printf("Connection request received\n");
+
+  /*
+   opening a file to keep the data instead of a dynamic array that needs to be
+   reallocated all the time Opens a file in read and write mode. It creates a
+   new file if it does not exist, if it exists, it erases the contents of the
+   file and the file pointer starts from the beginning.
+  */
+  FILE *data_file = fopen("stats", "w+");
+  if (data_file == NULL) {
+    printf("Error opening the file\n");
+    return 1;  // error
+  }
+
+  printf("Sender connected and data is received to a file\n");
+
+  fprintf(data_file, "\n\n --------------- Stats -------------\n");
+  double avgTime = 0;
+  double avgSpeed = 0;
+  clock_t start, finish;
+
+  char *recv_data = NULL;
+  int data_len = 0;
+  char total_size[SIZE_DATA] = {0};  // 2mb, and initializing the array with 0
+
+  receive_state = 0;
+  int run = 1;
+
+  start = clock();  // opening the clock
+  finish = clock();
+
+  do {
+    receive_state =
+        rudp_receive(socket, &recv_data, &data_len);  // receive value
+
+    if (receive_state == -5)  // means sender closed the connection
+    {
+      break;
     }
 
-    // Parse command line arguments
-    int port = atoi(argv[2]);
-
-    // Create a UDP socket
-    int sockfd = rudp_socket();
-    if (sockfd == -1) {
-        perror("rudp_socket() failed");
-        return 1;
-    }
-    printf("Created an RUDP socket\n");
-
-    // Bind the socket to the specified port
-    if (rudp_bind(sockfd, port) != 0) {
-        perror("rudp_bind() failed");
-        rudp_close(sockfd);
-        return 1;
-    }
-    printf("Bound RUDP socket to port %d\n", port);
-
-    // Declare a RUDP_Packet variable to hold the received packet
-    RUDP_Packet received_packet;
-
-    // Receive the file and measure time
-    struct timeval start_time, end_time;
-    gettimeofday(&start_time, NULL);
-
-    // Receive the file using rudp_receive()
-    int received_bytes = rudp_receive(sockfd, &received_packet);
-    if (received_bytes < 0) {
-        fprintf(stderr, "Error receiving packet.\n");
-        rudp_close(sockfd);
-        return 1;
+    else if (receive_state == -1) {
+      printf("Error receiving the data");
+      return -1;
     }
 
-    gettimeofday(&end_time, NULL);
+    else if (receive_state == 1 &&
+             start < finish)  // got the data in the fiest one,
+                              // starting the timer again
+    {
+      start = clock();  // getting the time again
+    }
 
-    // Calculate the time taken to receive the file
-    double time_taken = (double)(end_time.tv_sec - start_time.tv_sec) * 1000 +
-                        (double)(end_time.tv_usec - start_time.tv_usec) / 1000;
+    else if (receive_state == 1) {
+      strcat(total_size, recv_data); /* Append SRC onto DEST.  */
+    }
 
-    // Calculate the bandwidth
-    double bandwidth = (double)FILE_SIZE / (time_taken / 1000);
+    else if (receive_state == 5) {
+      strcat(total_size, recv_data);
+      printf("received total: %zu\n", sizeof(total_size));
 
-    // Print out statistics
-    printf("----------------------------------\n");
-    printf("- * Statistics * -\n");
-    printf("- Time: %.2f ms\n", time_taken);
-    printf("- Bandwidth: %.2f MB/s\n", bandwidth);
-    printf("----------------------------------\n");
+      finish = clock();  // getting the time to calculate the time for stats
+      double how_long = ((double)(finish - start)) / CLOCKS_PER_SEC;
+      avgTime += how_long;
 
-    // Close the socket
-    rudp_close(sockfd);
-    printf("Closed the RUDP socket\n");
+      double speed = 2 / how_long;
+      avgSpeed += speed;
 
-    return 0;
+      fprintf(data_file, "Run #%d Data: Time=%f sec' Speed=%f MB/s\n", run,
+              how_long, speed);
+
+      memset(total_size, 0,
+             sizeof(total_size));  // reseting it for the next income data
+      run++;                       // incrementing the run counter
+    }
+  } while (receive_state >= 0);
+
+  printf("closing connection!\n");
+
+  // adding to our data file more stats
+  fprintf(data_file, "\n");
+  fprintf(data_file, "Average time: %f sec'\n", avgTime / (run - 1));
+  fprintf(data_file, "Average speed: %f MB/sec'\n", avgSpeed / (run - 1));
+
+  fprintf(data_file,
+          "\n\n----------------------------------\n");  // for ending like in
+                                                        // the exmple
+
+  rewind(data_file);  // setting the pointer to the begining of the file,
+                      // to print know the data to the user from the file.
+
+  char buffer[100];  // buffer for getting the text from the file and printing
+                     // it to the user
+
+  while (fgets(buffer, 100, data_file) !=
+         NULL)  // while it is not the end of the file aka EOF
+  {
+    printf("%s", buffer);
+  }
+
+  // closing the file and deleting it
+  fclose(data_file);
+  remove("stats");
+
+  printf("Receiver end\n");
+  return 0;
 }
