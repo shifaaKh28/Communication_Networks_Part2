@@ -93,118 +93,118 @@ int rudp_send(int socket, const char *data, int size) {
 }
 
 int seq_number = 0;
-int rudp_receive(int socket, char **buffer, int *size) {
-    // Allocate memory for the received RUDP packet
-    RUDP_Packet *rudp = malloc(sizeof(RUDP_Packet));
-     if (rudp == NULL) {
-        perror("Memory allocation failed");
-        return -1;
-    }
-    // Initialize the memory block to zero
-    memset(rudp, 0, sizeof(RUDP_Packet));
+// int rudp_receive(int socket, char **buffer, int *size) {
+//     // Allocate memory for the received RUDP packet
+//     RUDP_Packet *rudp = malloc(sizeof(RUDP_Packet));
+//      if (rudp == NULL) {
+//         perror("Memory allocation failed");
+//         return -1;
+//     }
+//     // Initialize the memory block to zero
+//     memset(rudp, 0, sizeof(RUDP_Packet));
 
-    // Receive data from the socket into the allocated memory
-    int recv_data = recvfrom(socket, rudp, sizeof(RUDP_Packet) - 1, 0, NULL, 0);
-    if (recv_data == -1) {  
-        // Handle the case when an error occurs during receiving
-        perror("Error: failed recieving data");
-        free(rudp);
-        return -1; 
-    }
+//     // Receive data from the socket into the allocated memory
+//     int recv_data = recvfrom(socket, rudp, sizeof(RUDP_Packet) - 1, 0, NULL, 0);
+//     if (recv_data == -1) {  
+//         // Handle the case when an error occurs during receiving
+//         perror("Error: failed recieving data");
+//         free(rudp);
+//         return -1; 
+//     }
 
-    // Verify the checksum to ensure data integrity
-    if (calculate_checksum(rudp) != rudp->checksum) {  
-        free(rudp);
-        return -1;
-    }
+//     // Verify the checksum to ensure data integrity
+//     if (calculate_checksum(rudp) != rudp->checksum) {  
+//         free(rudp);
+//         return -1;
+//     }
 
-    // Send acknowledgment for the received packet
-    if (send_ack(socket, rudp) == -1) {
-        free(rudp);
-        return -1;
-    }
+//     // Send acknowledgment for the received packet
+//     if (send_ack(socket, rudp) == -1) {
+//         free(rudp);
+//         return -1;
+//     }
 
-    // Handle connection request
-    if (rudp->flags.isSyn == 1) {  
-        printf("there is a new request for connection\n");
-        free(rudp);
-        return 0;  // Connection request received
-    }
+//     // Handle connection request
+//     if (rudp->flags.isSyn == 1) {  
+//         printf("there is a new request for connection\n");
+//         free(rudp);
+//         return 0;  // Connection request received
+//     }
 
-    // Check if the received packet is expected based on sequence number
-    if (rudp->sequalNum == seq_number) {
-        // Handle regular data packet
-        if (rudp->flags.isData == 1 && rudp->sequalNum == 0 ) {
-            set_time(socket, 1 * 10);
-        }
-        // Handle the case when the entire message is received and the connection is closed
-        if (  rudp->flags.isData == 1 && rudp->flags.fin == 1) {  
-            *buffer = malloc(rudp->length);
-            if (*buffer == NULL) {
-            perror("Failed to allocate memory for the buffer");
-            free(rudp);
-            return -1;  // Error: Memory allocation failed
-         }
-             // Copy the received data into the buffer
-            memcpy(*buffer, rudp->data, rudp->length);
-            *size = rudp->length;
-            free(rudp);
-            seq_number = 0; 
-            set_time(socket, 10000000);
-            return 5;  // Message received and connection closed
-        }
+//     // Check if the received packet is expected based on sequence number
+//     if (rudp->sequalNum == seq_number) {
+//         // Handle regular data packet
+//         if (rudp->flags.isData == 1 && rudp->sequalNum == 0 ) {
+//             set_time(socket, 1 * 10);
+//         }
+//         // Handle the case when the entire message is received and the connection is closed
+//         if (  rudp->flags.isData == 1 && rudp->flags.fin == 1) {  
+//             *buffer = malloc(rudp->length);
+//             if (*buffer == NULL) {
+//             perror("Failed to allocate memory for the buffer");
+//             free(rudp);
+//             return -1;  // Error: Memory allocation failed
+//          }
+//              // Copy the received data into the buffer
+//             memcpy(*buffer, rudp->data, rudp->length);
+//             *size = rudp->length;
+//             free(rudp);
+//             seq_number = 0; 
+//             set_time(socket, 10000000);
+//             return 5;  // Message received and connection closed
+//         }
 
-        // Handle regular data packet
-        if (rudp->flags.isData == 1) {  
-            *buffer = malloc(rudp->length);
-              if (*buffer == NULL) {
-              perror("Failed to allocate memory for the buffer");
-              free(rudp);
-              return -1;  // Error: Memory allocation failed
-    }
-            memcpy(*buffer, rudp->data, rudp->length);
-            *size = rudp->length; 
-            free(rudp);
-            seq_number++;  
-            return 1;  // Regular data packet received
-        }
-    }
-    // Handle unexpected or out-of-order data packet
-    else if (rudp->flags.isData == 1) {
-        free(rudp);
-        return 0;  // Unexpected or out-of-order data packet
-    }
+//         // Handle regular data packet
+//         if (rudp->flags.isData == 1) {  
+//             *buffer = malloc(rudp->length);
+//               if (*buffer == NULL) {
+//               perror("Failed to allocate memory for the buffer");
+//               free(rudp);
+//               return -1;  // Error: Memory allocation failed
+//     }
+//             memcpy(*buffer, rudp->data, rudp->length);
+//             *size = rudp->length; 
+//             free(rudp);
+//             seq_number++;  
+//             return 1;  // Regular data packet received
+//         }
+//     }
+//     // Handle unexpected or out-of-order data packet
+//     else if (rudp->flags.isData == 1) {
+//         free(rudp);
+//         return 0;  // Unexpected or out-of-order data packet
+//     }
 
-    // Handle closing connection
-    if (rudp->flags.fin == 1) {  
-        // Process closing connection
-        free(rudp);
-        printf("received close connection\n");
-        set_time(socket, 1 * 10);
-        rudp = malloc(sizeof(RUDP_Packet));
-        time_t finishing= time(NULL);
+//     // Handle closing connection
+//     if (rudp->flags.fin == 1) {  
+//         // Process closing connection
+//         free(rudp);
+//         printf("received close connection\n");
+//         set_time(socket, 1 * 10);
+//         rudp = malloc(sizeof(RUDP_Packet));
+//         time_t finishing= time(NULL);
 
 
-        // Wait for acknowledgement for the closing packet
-        while ((double)(time(NULL) - finishing) < 1) {
-            memset(rudp, 0, sizeof(RUDP_Packet));
-            recvfrom(socket, rudp, sizeof(RUDP_Packet) - 1, 0, NULL, 0);
-            if (rudp->flags.fin == 1) {
-                if (send_acknowledgement(socket, rudp) == -1) { 
-                    free(rudp);
-                    return -1;  // Error sending acknowledgment for closing packet
-                }
-                finishing = time(NULL);
-            }
-        }
+//         // Wait for acknowledgement for the closing packet
+//         while ((double)(time(NULL) - finishing) < 1) {
+//             memset(rudp, 0, sizeof(RUDP_Packet));
+//             recvfrom(socket, rudp, sizeof(RUDP_Packet) - 1, 0, NULL, 0);
+//             if (rudp->flags.fin == 1) {
+//                 if (send_acknowledgement(socket, rudp) == -1) { 
+//                     free(rudp);
+//                     return -1;  // Error sending acknowledgment for closing packet
+//                 }
+//                 finishing = time(NULL);
+//             }
+//         }
 
-        free(rudp);
-        close(socket);
-        return -5;  // Connection closed
-    }
-    free(rudp);
-    return 0;  // No data received or unexpected packet type
-}
+//         free(rudp);
+//         close(socket);
+//         return -5;  // Connection closed
+//     }
+//     free(rudp);
+//     return 0;  // No data received or unexpected packet type
+// }
 
 int rudp_connect(int socket, const char *ip,unsigned short int port) {
     // Set timeout for the socket
@@ -378,7 +378,241 @@ int wait_ack(int sockfd, int seq_num, clock_t st, clock_t tout) {
     free(ack_packet);
     return 0;  // Timeout reached without acknowledgment
 }
+int rudp_close(int socket){
+ RUDP_Packet *closeing_pack = malloc(sizeof(RUDP_Packet));
+    if (closeing_pack == NULL) {
+        perror("Failed to allocate memory for closing packet");
+        return -1;  // Error occurred
+      }
+    
+    // Initialize the closing packet
+    memset(closeing_pack, 0, sizeof(RUDP_Packet));
+    closeing_pack->flags.fin = 1;  // Indicate closing the connection
+    closeing_pack->sequalNum = -1;
+    closeing_pack->checksum = calculate_checksum(closeing_pack);
+
+    // Send the closing packet and wait for acknowledgment
+    do {
+        int send_result = sendto(socket, closeing_pack, sizeof(RUDP_Packet), 0, NULL, 0);
+        if (send_result == -1) {
+            perror("Failed to send closing packet");
+            free(closeing_pack);
+            return -1;  // Error occurred
+        }
+    } while (wait_ack(socket, -1, clock(), 1) <= 0); // Wait for acknowledgment
+
+    // Close the socket
+    close(socket);
+    
+    // Free allocated memory for the closing packet
+    free(closeing_pack);
+
+    // Return success
+    return 1;
+  
+    }
+int rudp_accept(int sockfd, unsigned short int port) {
+    memset(&server_address, 0, sizeof(server_address));
+    server_address.sin_family = AF_INET; // IPV4
+    server_address.sin_port = htons(port);
+
+    // Bind the socket to the specified port
+    if (bind(sockfd, (struct sockaddr*)&server_address, sizeof(server_address)) < 0) {
+        perror("Error binding the socket");
+        close(sockfd);
+        return -1;
+    }
+
+    // Initialize client address structure
+    struct sockaddr_in client_address;
+    memset(&client_address, 0, sizeof(client_address));
+    socklen_t client_len = sizeof(client_address);
+
+    // Receive connection request
+    RUDP_Packet *rudp = malloc(sizeof(RUDP_Packet));
+    if (rudp == NULL) {
+        perror("Failed to allocate memory for RUDP packet");
+        close(sockfd);
+        return -1;
+    }
+    memset(rudp, 0, sizeof(RUDP_Packet));
+    if (recvfrom(sockfd, rudp, sizeof(RUDP_Packet), 0, (struct sockaddr*)&client_address, &client_len) < 0) {
+        perror("Error receiving connection request");
+        close(sockfd);
+        free(rudp);
+        return -1;
+    }
+
+    // Connect to the client
+    if (connect(sockfd, (struct sockaddr*)&client_address, client_len) < 0) {
+        perror("Error connecting to the client");
+        free(rudp);
+        close(sockfd);
+        return -1;
+    }
+
+    // Send acknowledgment
+    if (rudp->flags.ack == 1) {
+        RUDP_Packet *rudp_ack = malloc(sizeof(RUDP_Packet));
+        if (rudp_ack == NULL) {
+            perror("Failed to allocate memory for acknowledgment packet");
+            free(rudp);
+            close(sockfd);
+            return -1;
+        }
+        memset(rudp_ack, 0, sizeof(RUDP_Packet));
+        rudp_ack->flags.ack = 1;
+        rudp_ack->flags.isSyn = 1;
+
+        if (sendto(sockfd, rudp_ack, sizeof(RUDP_Packet), 0, NULL, 0) < 0) {
+            perror("Failed to send acknowledgment packet");
+            free(rudp);
+            free(rudp_ack);
+            return -1;
+        }
+
+        // Set timeout for the socket
+        struct timeval timeout;
+        timeout.tv_sec = 10;
+        timeout.tv_usec = 0;
+        if (setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0) {
+            perror("Error setting the timeout");
+            free(rudp);
+            free(rudp_ack);
+            return -1;
+        }
+
+        free(rudp);
+        free(rudp_ack);
+        return 1;
+    }
+
+    // No acknowledgment received
+    free(rudp);
+    return 0;
+}
+int rudp_receive(int socket, char **buffer, int *size) {
+    // Allocate memory for the received RUDP packet
+    RUDP_Packet *rudp = malloc(sizeof(RUDP_Packet));
+     if (rudp == NULL) {
+        perror("Memory allocation failed");
+        return -1;
+    }
+    // Initialize the memory block to zero
+    memset(rudp, 0, sizeof(RUDP_Packet));
+
+    // Receive data from the socket into the allocated memory
+    int recv_data = recvfrom(socket, rudp, sizeof(RUDP_Packet) - 1, 0, NULL, 0);
+    if (recv_data == -1) {  
+        // Handle the case when an error occurs during receiving
+        perror("Error: failed recieving data");
+        free(rudp);
+        return -1; 
+    }
+
+    // Verify the checksum to ensure data integrity
+    if (calculate_checksum(rudp) != rudp->checksum) {  
+        free(rudp);
+        return -1;
+    }
+
+    // Send acknowledgment for the received packet
+    if (send_ack(socket, rudp) == -1) {
+        free(rudp);
+        return -1;
+    }
+
+    // Handle connection request
+    if (rudp->flags.isSyn == 1) {  
+        printf("there is a new request for connection\n");
+        free(rudp);
+        return 0;  // Connection request received
+    }
+
+    // Check if the received packet is expected based on sequence number
+    if (rudp->sequalNum == seq_number) {
+        // Handle regular data packet
+        if (rudp->flags.isData == 1 && rudp->sequalNum == 0 ) {
+            set_time(socket, 1 * 10);
+        }
+        // Handle the case when the entire message is received and the connection is closed
+        if (rudp->flags.isData == 1 && rudp->flags.fin == 1) {  
+            *buffer = malloc(rudp->length);
+            if (*buffer == NULL) {
+            perror("Failed to allocate memory for the buffer");
+            free(rudp);
+            return -1;  // Error: Memory allocation failed
+         }
+             // Copy the received data into the buffer
+            memcpy(*buffer, rudp->data, rudp->length);
+            *size = rudp->length;
+            free(rudp);
+            seq_number = 0; 
+             struct timeval timeout;
+            timeout.tv_sec = 100000; // 10 seconds timeout
+            timeout.tv_usec = 0;
+            if (setsockopt(socket, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0) {
+            perror("setsockopt");
+            return -1;
+        }
+            return 5;  // Message received and connection closed
+        }
+
+        // Handle regular data packet
+        if (rudp->flags.isData == 1) {  
+            *buffer = malloc(rudp->length);
+              if (*buffer == NULL) {
+              perror("Failed to allocate memory for the buffer");
+              free(rudp);
+              return -1;  // Error: Memory allocation failed
+    }
+            memcpy(*buffer, rudp->data, rudp->length);
+            *size = rudp->length; 
+            free(rudp);
+            seq_number++;  
+            return 1;  // Regular data packet received
+        }
+    }
+    // Handle unexpected or out-of-order data packet
+    else if (rudp->flags.isData == 1) {
+        free(rudp);
+        return 0;  // Unexpected or out-of-order data packet
+    }
+
+    // Handle closing connection
+    if (rudp->flags.fin == 1) {  
+        // Process closing connection
+        free(rudp);
+        printf("received close connection\n");
+
+        struct timeval timeout;
+        timeout.tv_sec = 10; // 10 seconds timeout
+        timeout.tv_usec = 0;
+        if (setsockopt(socket, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0) {
+        perror("setsockopt");
+        return -1;
+     //   set_time(socket, 1 * 10);
+        rudp = malloc(sizeof(RUDP_Packet));
+        time_t finishing= time(NULL);
 
 
+        // Wait for acknowledgement for the closing packet
+        while ((double)(time(NULL) - finishing) < 1) {
+            memset(rudp, 0, sizeof(RUDP_Packet));
+            recvfrom(socket, rudp, sizeof(RUDP_Packet) - 1, 0, NULL, 0);
+            if (rudp->flags.fin == 1) {
+                if (send_acknowledgement(socket, rudp) == -1) { 
+                    free(rudp);
+                    return -1;  // Error sending acknowledgment for closing packet
+                }
+                finishing = time(NULL);
+            }
+        }
 
-
+        free(rudp);
+        close(socket);
+        return -5;  // Connection closed
+    }
+    free(rudp);
+    return 0;  // No data received or unexpected packet type
+}
