@@ -3,11 +3,11 @@
 #include <sys/time.h>
 #include "RUDP.API.h"
 
-#define FILE_SIZE 2097152    // 2 MB
+#define FILE_SIZE 2097152 // 2 MB
 
 int main(int argc, char *argv[]) {
     // Check command line arguments
-    if (argc != 3) {
+    if (argc != 3 || strcmp(argv[1], "-p") != 0) {
         fprintf(stderr, "Usage: %s -p <port>\n", argv[0]);
         return 1;
     }
@@ -31,12 +31,20 @@ int main(int argc, char *argv[]) {
     }
     printf("Bound RUDP socket to port %d\n", port);
 
+    // Declare a RUDP_Packet variable to hold the received packet
+    RUDP_Packet received_packet;
+
     // Receive the file and measure time
     struct timeval start_time, end_time;
     gettimeofday(&start_time, NULL);
 
-    // Implement file receiving logic
     // Receive the file using rudp_receive()
+    int received_bytes = rudp_receive(sockfd, &received_packet);
+    if (received_bytes < 0) {
+        fprintf(stderr, "Error receiving packet.\n");
+        rudp_close(sockfd);
+        return 1;
+    }
 
     gettimeofday(&end_time, NULL);
 
