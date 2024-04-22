@@ -1,120 +1,107 @@
-/*Header file for the Reliable UDP (RUDP) API.*/
+/* Header file for the Reliable UDP (RUDP) API. */
+
 #ifndef RUDP_API_H
 #define RUDP_API_H
 
-#include <stdint.h>   // For uint32_t, uint16_t
-#include <stdbool.h>  // For bool type
+#include <stdint.h>  
+#include <stdbool.h>  
 #include <arpa/inet.h>
 #include <netinet/tcp.h>
-#include <stdbool.h>
-#define BUFFER_SIZE 2097152 //Maximum size for sending/receiving data in RUDP.
-#define MAX_PACKET_SIZE 8192
 
-/**
- * @brief Enum representing flags used in the RUDP protocol.
- * These flags indicate the type of packet or control message in the RUDP protocol.
- */
-typedef enum {
-    SYN = 1,       /**< Synchronization flag */
-    ACK = 2,       /**< Acknowledgment flag */
-    SYN_ACK = 3,   /**< SYN-ACK flag */
-    FIN = 4,       /**< Finish flag */
-    FIN_ACK = 6,   /**< FIN-ACK flag */
-    PUSH = 16      /**< Push flag */
-} RUDP_Flag;
+// Maximum size for data payload in an RUDP packet
+#define MAX_SIZE 60000 
 
+// Structure to represent various flags in the RUDP protocol
+struct Flags {
+    bool fin;        // Indicates if the packet is a finish flag
+    bool ack;               // Indicates if the packet is an acknowledgment
+    bool isSyn;    // Indicates if the packet is synchronized
+    bool isData;      // Indicates if the packet contains data
+};
 
-// Structure representing the RUDP header
-typedef struct
-{
-    uint16_t length;// Length of the packet (header + data)
-    uint16_t seq;// Sequence number of the packet
-    uint16_t ack_num;// Acknowledgment number
-    uint8_t flags;// Flags indicating the type of packet
-    uint32_t checksum;// Checksum of the packet
-} RUDP_Header;
-
-// RUDP socket
-typedef struct {
-int socket_fd;                // UDP socket file descriptor
-bool isServer;                // True if the RUDP socket acts like a server, false for client.
-bool isConnected;             // True if there is an active connection, false otherwise.
-struct sockaddr_in dest_addr; // Destination address. Client fills it when it connects via rudp_connect(), server fills it when it accepts a connection via rudp_accept().
-} RUDP_Socket;
-
-// Structure representing an RUDP packet
-typedef struct{
-    RUDP_Header header; // RUDP header
-    char data[MAX_PACKET_SIZE];// Data payload of the packet
+// Structure representing a Reliable UDP packet
+typedef struct RUDP_Packet {
+    struct Flags flags; // Flags indicating the type of packet
+    int checksum;       // Checksum of the packet
+    int sequalNum;      // Sequence number of the packet
+    int length;     // Length of the data payload
+    char data[MAX_SIZE]; // Data payload
 } RUDP_Packet;
-
-
 
 // Function prototypes:
 
 /**
  * @brief Creates a new RUDP socket.
- * @param isServer Indicates if the socket is acting as a server (true) or client (false).
- * @param listen_port The port number to bind the socket to (for server only).
- * @return A pointer to the newly created RUDP socket structure.
-//  */
-// RUDP_Socket *rudp_socket(bool isServer, unsigned int port);
-
-// Creating the socket, return -1 if fails
+ * @return File descriptor of the created socket, or -1 on failure.
+ */
 int rudp_socket();
 
 /**
- * @brief Sends data stored in the buffer to the other side.
- * 
- * @param rudp_socket Pointer to the RUDP socket structure.
- * @param flags Flags indicating the type of packet to be sent.
- * @param data Pointer to the data buffer to be sent.
- * @param data_size Size of the data to be sent.
- * @return Number of sent bytes on success, -1 on error.
+ * @brief Sends data over the RUDP connection.
+ * @param sockfd File descriptor of the RUDP socket.
+ * @param data Pointer to the data to be sent.
+ * @param size Size of the data to be sent.
+ * @return Number of bytes sent on success, or -1 on failure.
  */
-int rudp_send(RUDP_Socket *rudp_socket, uint8_t flags, char *data, size_t data_size);
+int rudp_send(int sockfd, const char *data, int size);
 
 /**
- * @brief Receives data from the other side and stores it into the buffer.
- * @param rudp_socket Pointer to the RUDP socket structure.
- * @param packet Pointer to the RUDP packet structure to store the received data.
- * @return Number of received bytes on success, 0 if a FIN packet is received (disconnect), -1 on error.
+ * @brief Receives data over the RUDP connection.
+ * @param sockfd File descriptor of the RUDP socket.
+ * @param buffer Pointer to a pointer that will store the received data.
+ * @param length Pointer to an integer that will store the length of the received data.
+ * @return 0 on success, -1 on failure.
  */
-int rudp_receive(RUDP_Socket *rudp_socket, RUDP_Packet *packet);
+int rudp_receive(int sockfd, char **buffer, int *size);
 
 /**
- * @brief Closes the RUDP socket and releases all allocated resources. 
- * @param sockfd Pointer to the RUDP socket structure.
- * @return 1 on success, -1 on error.
+ * @brief Closes the RUDP socket.
+ * @param sockfd File descriptor of the RUDP socket.
+ * @return 0 on success, -1 on failure.
  */
-int rudp_close(RUDP_Socket *sockfd);
-
-//helper methods:
+int rudp_close(int sockfd);
 
 /**
- * @brief Attempts to establish a connection to the specified destination IP and port.
- * @param sockfd Pointer to the RUDP socket structure.
- * @param dest_ip Destination IP address.
- * @param dest_port Destination port number.
- * @return 1 on success, 0 on failure.
+ * @brief Establishes a connection to the specified IP address and port.
+ * @param socket File descriptor of the RUDP socket.
+ * @param ip IP address of the destination.
+ * @param port Port number of the destination.
+ * @return 0 on success, -1 on failure.
  */
-int rudp_connect(RUDP_Socket *sockfd, char *dest_ip, unsigned short int dest_port);
-
-/**
- * @brief Disconnects from an actively connected socket.
- * 
- * @param sockfd Pointer to the RUDP socket structure.
- * @return 1 on success, 0 when the socket is already disconnected (failure).
- */
-int rudp_disconnect(RUDP_Socket *sockfd);
+int rudp_connect(int socket, const char *ip, int port);
 
 /**
  * @brief Calculates the checksum for a given data buffer.
- * 
  * @param data Pointer to the data buffer.
  * @param bytes Number of bytes in the data buffer.
  * @return The calculated checksum.
  */
 unsigned short int calculate_checksum(void *data, unsigned int bytes);
+
+/**
+ * @brief Waits for acknowledgment from the receiver.
+ * @param socket File descriptor of the RUDP socket.
+ * @param sequal_num Sequence number of the packet to wait for acknowledgment.
+ * @param s Start time for timeout calculation.
+ * @param t Timeout value in clock ticks.
+ * @return 0 on success (acknowledgment received), -1 on failure (timeout).
+ */
+int wait_ack(int socket, int sequal_num, clock_t s, clock_t t);
+
+/**
+ * @brief Sends an acknowledgment packet for the received data packet.
+ * @param socket File descriptor of the RUDP socket.
+ * @param rudp Pointer to the received RUDP packet.
+ * @return 0 on success, -1 on failure.
+ */
+int send_ack(int socket, RUDP_Packet *rudp);
+
+/**
+ * @brief Sets the timeout value for the RUDP socket.
+ * @param socket File descriptor of the RUDP socket.
+ * @param time Timeout value in seconds.
+ * @return 0 on success, -1 on failure.
+ */
+int set_time(int socket, int time);
 
 #endif /* RUDP_API_H */
