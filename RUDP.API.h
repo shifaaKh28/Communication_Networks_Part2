@@ -10,6 +10,18 @@
 #define BUFFER_SIZE 2097152 //Maximum size for sending/receiving data in RUDP.
 #define MAX_PACKET_SIZE 8192
 
+/**
+ * @brief Enum representing flags used in the RUDP protocol.
+ * These flags indicate the type of packet or control message in the RUDP protocol.
+ */
+typedef enum {
+    SYN = 1,       /**< Synchronization flag */
+    ACK = 2,       /**< Acknowledgment flag */
+    SYN_ACK = 3,   /**< SYN-ACK flag */
+    FIN = 4,       /**< Finish flag */
+    FIN_ACK = 6,   /**< FIN-ACK flag */
+    PUSH = 16      /**< Push flag */
+} RUDP_Flag;
 
 
 // Structure representing the RUDP header
