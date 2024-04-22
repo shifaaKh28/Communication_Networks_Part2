@@ -75,7 +75,7 @@ int rudp_close(int sockfd);
  * @param port Port number of the destination.
  * @return 0 on success, -1 on failure.
  */
-int rudp_connect(int socket, const char *ip, int port);
+int rudp_connect(int socket, const char *ip, unsigned short int port);
 
 /**
 * @brief Calculates the checksum for the given RUDP packet.
@@ -88,11 +88,11 @@ unsigned short int calculate_checksum(RUDP_Packet *rudp);
  * @brief Waits for acknowledgment from the receiver.
  * @param socket File descriptor of the RUDP socket.
  * @param sequal_num Sequence number of the packet to wait for acknowledgment.
- * @param s Start time for timeout calculation.
- * @param t Timeout value in clock ticks.
+ * @param st Start time for timeout calculation.
+ * @param tout Timeout value in clock ticks.
  * @return 0 on success (acknowledgment received), -1 on failure (timeout).
  */
-int wait_ack(int socket, int sequal_num, clock_t s, clock_t t);
+int wait_ack(int sockfd, int sequal_num, clock_t s, clock_t t);
 
 /**
  * @brief Sends an acknowledgment packet for the received data packet.
@@ -100,7 +100,7 @@ int wait_ack(int socket, int sequal_num, clock_t s, clock_t t);
  * @param rudp Pointer to the received RUDP packet.
  * @return 0 on success, -1 on failure.
  */
-int send_ack(int socket, RUDP_Packet *rudp);
+int send_ack(int sockfd, RUDP_Packet *rudp);
 
 /**
  * @brief Sets the timeout value for the RUDP socket.
@@ -108,7 +108,7 @@ int send_ack(int socket, RUDP_Packet *rudp);
  * @param time Timeout value in seconds.
  * @return 0 on success, -1 on failure.
  */
-int set_time(int socket, int time);
+int set_time(int sockfd, int time);
 
 
 #endif /* RUDP_API_H */
