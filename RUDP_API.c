@@ -28,28 +28,70 @@ typedef enum {
     PUSH = 16      /**< Push flag */
 } RUDP_Flag;
 
-RUDP_Socket *rudp_socket(bool isServer, unsigned int port)
-{
+// RUDP_Socket *rudp_socket(bool isServer, unsigned int port)
+// {
+//     // Allocate memory for the socket structure
+//     RUDP_Socket *sockfd = malloc(sizeof(RUDP_Socket));
+//     if (!sockfd) {
+//         perror("malloc(3)");
+//         return NULL;
+//     }
+
+//     // Create a sockaddr_in structure for the server address
+//     struct sockaddr_in server = {0};
+//     server.sin_family = AF_INET;
+
+//     // Set the server's IP address to localhost
+//     if (inet_pton(AF_INET, SERVER_IP, &server.sin_addr) <= 0) {
+//         perror("inet_pton(3)");
+//         free(sockfd);
+//         return NULL;
+//     }
+
+//     // Set the server's port to the specified port (network byte order)
+//     server.sin_port = htons(port);
+
+//     // Create the UDP socket
+//     sockfd->socket_fd = socket(AF_INET, SOCK_DGRAM, 0);
+//     if (sockfd->socket_fd < 0) {
+//         perror("socket(2)");
+//         free(sockfd);
+//         return NULL;
+//     }
+
+//     sockfd->isServer = isServer;
+//     sockfd->isConnected = false;
+
+//     // Bind the socket if it's a server
+//     if (isServer) {
+//         if (bind(sockfd->socket_fd, (struct sockaddr *)&server, sizeof(server)) < 0) {
+//             perror("bind(2)");
+//             close(sockfd->socket_fd);
+//             free(sockfd);
+//             return NULL;
+//         }
+//     }
+//     else {
+//         // Set the receive timeout for client sockets
+//         struct timeval tv = {MAX_WAIT_TIME, 0};
+//         if (setsockopt(sockfd->socket_fd, SOL_SOCKET, SO_RCVTIMEO, (char *)&tv, sizeof(tv)) == -1) {
+//             perror("setsockopt(2)");
+//             close(sockfd->socket_fd);
+//             free(sockfd);
+//             return NULL;
+//         }
+//     }
+
+//     return sockfd;
+// }
+
+RUDP_Socket *rudp_socket() {
     // Allocate memory for the socket structure
     RUDP_Socket *sockfd = malloc(sizeof(RUDP_Socket));
     if (!sockfd) {
         perror("malloc(3)");
         return NULL;
     }
-
-    // Create a sockaddr_in structure for the server address
-    struct sockaddr_in server = {0};
-    server.sin_family = AF_INET;
-
-    // Set the server's IP address to localhost
-    if (inet_pton(AF_INET, SERVER_IP, &server.sin_addr) <= 0) {
-        perror("inet_pton(3)");
-        free(sockfd);
-        return NULL;
-    }
-
-    // Set the server's port to the specified port (network byte order)
-    server.sin_port = htons(port);
 
     // Create the UDP socket
     sockfd->socket_fd = socket(AF_INET, SOCK_DGRAM, 0);
@@ -59,28 +101,7 @@ RUDP_Socket *rudp_socket(bool isServer, unsigned int port)
         return NULL;
     }
 
-    sockfd->isServer = isServer;
     sockfd->isConnected = false;
-
-    // Bind the socket if it's a server
-    if (isServer) {
-        if (bind(sockfd->socket_fd, (struct sockaddr *)&server, sizeof(server)) < 0) {
-            perror("bind(2)");
-            close(sockfd->socket_fd);
-            free(sockfd);
-            return NULL;
-        }
-    }
-    else {
-        // Set the receive timeout for client sockets
-        struct timeval tv = {MAX_WAIT_TIME, 0};
-        if (setsockopt(sockfd->socket_fd, SOL_SOCKET, SO_RCVTIMEO, (char *)&tv, sizeof(tv)) == -1) {
-            perror("setsockopt(2)");
-            close(sockfd->socket_fd);
-            free(sockfd);
-            return NULL;
-        }
-    }
 
     return sockfd;
 }
@@ -160,62 +181,8 @@ int rudp_receive(RUDP_Socket *sockfd, RUDP_Packet *packet) {
     return data_size;
 }
 
-int rudp_connect(RUDP_Socket *sockfd, const char *dest_ip, unsigned short int dest_port) {
-    // Check if the socket is already connected or acting as a server
-    if (sockfd->isServer || sockfd->isConnected) {
-        fprintf(stderr, "Socket is already connected.\n");
-        return 0;
-    }
-
-    // Create a sockaddr_in structure for the destination address
-    memset(&sockfd->dest_addr, 0, sizeof(sockfd->dest_addr));
-    sockfd->dest_addr.sin_family = AF_INET;
-
-    // Convert destination IP to network format and store it in dest_addr
-    if (inet_pton(AF_INET, dest_ip, &sockfd->dest_addr.sin_addr) <= 0) {
-        perror("inet_pton(3)");
-        return 0;
-    }
-    sockfd->dest_addr.sin_port = htons(dest_port);
-
-    // Send SYN packet
-    printf("Sending SYN packet.\n");
-    int sent = rudp_send(sockfd, SYN, NULL, 0);
-    if (sent == -1) {
-        printf("Failed to send SYN packet.\n");
-        return 0;
-    }
-
-    // Receive SYN-ACK packet
-    RUDP_Packet packet;
-    int recv = rudp_receive(sockfd, &packet);
-    if (recv == -1) {
-        printf("Failed to receive SYN-ACK packet.\n");
-        return 0;
-    }
-
-    // Check if received packet is SYN-ACK
-    if (packet.header.flags == SYN_ACK) {
-        printf("Received SYN-ACK packet.\n");
-
-        // Send ACK packet
-        printf("Sending ACK packet.\n");
-        sent = rudp_send(sockfd, ACK, NULL, 0);
-        if (sent == -1) {
-            return 0;
-        }
-        
-        // Update socket status to connected
-        sockfd->isConnected = true;
-    } else {
-        printf("Received unexpected packet.\n");
-        printf("Received %d\n", packet.header.flags);
-        return 0;
-    }
-    return 1;
-}
-
-int rudp_connect(RUDP_Socket *sockfd, char *dest_ip, unsigned int dest_port) {
+#include "RUDP.API.h"
+int rudp_connect(RUDP_Socket *sockfd, char *dest_ip, unsigned short int dest_port) {
     // Check if the socket is already connected or acting as a server
     if (sockfd->isServer || sockfd->isConnected) {
         fprintf(stderr, "Error: Socket is already connected or acting as a server.\n");
@@ -272,6 +239,7 @@ int rudp_connect(RUDP_Socket *sockfd, char *dest_ip, unsigned int dest_port) {
         return 0;
     }
 }
+
 int rudp_disconnect(RUDP_Socket *sockfd) {
     // Check if the socket is not connected
     if (!sockfd->isConnected) {
@@ -376,7 +344,7 @@ int rudp_accept(RUDP_Socket *server_socket) {
     // Create and send SYN-ACK packet to the client
     RUDP_Packet syn_ack_packet;
     syn_ack_packet.header.flags = SYN_ACK;
-    ssize_t sent_bytes = rudp_send(server_socket, SYN_ACK, &syn_ack_packet, sizeof(RUDP_Header));
+    ssize_t sent_bytes = rudp_send(server_socket, SYN_ACK, (char*)&syn_ack_packet, sizeof(RUDP_Header));
     if (sent_bytes < 0) {
         fprintf(stderr, "Error sending SYN-ACK packet.\n");
         return -1;
@@ -401,5 +369,42 @@ int rudp_accept(RUDP_Socket *server_socket) {
     server_socket->isConnected = true;
 
     return 0;
+}
+
+int rudp_send(RUDP_Socket *rudp_socket, uint8_t flags, char *data, size_t data_size)
+{
+    // Ensure that the socket and data are valid
+    if (rudp_socket == NULL || data == NULL || data_size == 0) {
+        return -1; // Invalid arguments
+    }
+
+    // Calculate the number of packets needed to send the data
+    size_t num_packets = (data_size + MAX_PACKET_SIZE - 1) / MAX_PACKET_SIZE;
+
+    // Send each packet individually
+    for (size_t i = 0; i < num_packets; ++i) {
+        // Calculate the size of the current packet's data
+        size_t packet_data_size = (i == num_packets - 1) ? (data_size % MAX_PACKET_SIZE) : MAX_PACKET_SIZE;
+
+        // Create a packet structure
+        RUDP_Packet packet;
+        packet.header.flags = flags;
+        packet.header.seq = i; // Incremental sequence number for each packet
+        packet.header.length = sizeof(RUDP_Header) + packet_data_size;
+
+        // Copy the data into the packet
+        memcpy(packet.data, data + i * MAX_PACKET_SIZE, packet_data_size);
+
+        // Calculate and set the checksum
+        packet.header.checksum = calculate_checksum(packet.data, packet_data_size);
+
+        // Send the packet
+        if (sendto(rudp_socket->socket_fd, (const char *)&packet, sizeof(RUDP_Header) + packet_data_size, 0,
+                   (struct sockaddr *)&rudp_socket->dest_addr, sizeof(rudp_socket->dest_addr)) == -1) {
+            return -1; // Error occurred during send
+        }
+    }
+
+    return data_size; // Return the size of the data sent
 }
 
