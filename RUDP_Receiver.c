@@ -44,7 +44,7 @@ int main(int argc, char *argv[]) {
 
     // Wait for RUDP connection
     printf("Waiting for RUDP connection...\n");
-    int sockfd  = rudp_socket();
+    int sockfd = rudp_socket();
     if (rudp_socket == NULL) {
         perror("rudp_socket");
         close(sockfd);
