@@ -18,19 +18,19 @@
  * @struct Flags
  * @brief Struct to represent the flags in RUDP packets.
  */
-struct Flags {
+typedef struct Flags {
   bool fin;        /**< Indicates finishing. */
   bool ack;   /**< Indicates acknowledgment. */
   bool isSyn;    /**< Indicates synchronization. */
   bool isData;      /**< Indicates data packet. */
-};
+}Flags;
 
 /**
  * @typedef RUDP_Packet
  * @brief Typedef for RUDP packet structure.
  */
 typedef struct _RUDP {
-  struct Flags flags;     /**< Flags for the RUDP packet. */
+  Flags flags;     /**< Flags for the RUDP packet. */
   int checksum;           /**< Checksum for the packet. */
   int length;         /**< Length of data in the packet. */
   int sequalNum;          /**< Sequence number for the packet. */
@@ -75,7 +75,7 @@ int rudp_close(int socket);
  * @param port Port number of the remote socket.
  * @return 1 on success, 0 on failure.
  */
-int rudp_connect(int socket, const char *ip,  int port);
+int rudp_connect(int socket, const char *ip,  unsigned short int port);
 
 /**
  * @brief Accepts incoming connection requests on a socket.
@@ -83,14 +83,14 @@ int rudp_connect(int socket, const char *ip,  int port);
  * @param port Port number to bind the socket to.
  * @return 1 on success, 0 on failure.
  */
-int rudp_accept(int sockfd,  int port);
+int rudp_accept(int sockfd,  unsigned short int port);
 
 /**
  * @brief Calculates the checksum for the given RUDP packet.
  * @param rudp Pointer to the RUDP packet for which the checksum is calculated.
  * @return The checksum value.
  */
-int checksum(RUDP_Packet *rudp);
+int calculate_checksum(RUDP_Packet *rudp);
 
 /**
  * @brief Waits for an acknowledgment packet.
@@ -109,13 +109,5 @@ int wait_ack(int socket, int seq_num, clock_t start_time, clock_t timeout);
  * @return 1 on success, or -1 on failure.
  */
 int send_ack(int socket, RUDP_Packet *rudp);
-
-/**
- * @brief Sets a timeout value for the socket.
- * @param socket File descriptor of the RUDP socket.
- * @param time Timeout value in seconds.
- * @return 0 on success, or -1 on failure.
- */
-int set_timeout(int socket, int time);
 
 #endif   /* RUDP_API_H */
