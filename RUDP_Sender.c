@@ -1,5 +1,4 @@
 #include <arpa/inet.h>   // For manipulating IP addresses
-#include <stdbool.h>     // For boolean data type
 #include <stdio.h>       // For standard input/output operations
 #include <stdlib.h>      // For standard library functions
 #include <string.h>      // For string manipulation functions
