@@ -12,7 +12,7 @@
 #include <string.h>
 #include <stdint.h>
 
-#define MAX_SIZE 60000  /**< Maximum size for data packets. */
+#define MAX_PACK_SIZE 60000  /**< Maximum size for data packets. */
 
 /**
  * @struct Flags
@@ -34,7 +34,7 @@ typedef struct _RUDP {
   uint16_t checksum;           /**< Checksum for the packet. */
   uint16_t length;         /**< Length of data in the packet. */
   int sequalNum;          /**< Sequence number for the packet. */
-  char data[MAX_SIZE];    /**< Data in the packet. */
+  char data[MAX_PACK_SIZE];    /**< Data in the packet. */
 } RUDP_Packet;
 
 /**
