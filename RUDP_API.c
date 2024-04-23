@@ -2,7 +2,6 @@
 
 #include <arpa/inet.h>  // For functions like inet_pton
 #include <errno.h>      // For error handling
-#include <stdbool.h>    // For boolean types
 #include <stdio.h>      // For standard I/O operations
 #include <stdlib.h>     // For dynamic memory allocation and other standard functions
 #include <string.h>     // For string manipulation functions
@@ -47,9 +46,9 @@ int rudp_send(int socket, const char *data, int size) {
     for (int i = 0; i < packets; i++) {
         memset(rudp, 0, sizeof(RUDP_Packet));
         rudp->sequalNum = i;
-        rudp->flags.isData = true;
+        rudp->flags.isData = 1;
         if (i == packets - 1 && last_pack_size == 0) {
-            rudp->flags.fin = true;
+            rudp->flags.fin = 1;
         }
         memcpy(rudp->data, data + i * MAX_SIZE, MAX_SIZE);
         rudp->length = MAX_SIZE;
@@ -70,8 +69,8 @@ int rudp_send(int socket, const char *data, int size) {
     if (last_pack_size > 0) {
         memset(rudp, 0, sizeof(RUDP_Packet));
         rudp->sequalNum = packets;
-        rudp->flags.isData = true;
-        rudp->flags.fin = true;
+        rudp->flags.isData = 1;
+        rudp->flags.fin = 1;
         memcpy(rudp->data, data + (packets * MAX_SIZE), last_pack_size);
         rudp->length = last_pack_size;
         rudp->checksum = calculate_checksum(rudp);
@@ -143,7 +142,7 @@ int rudp_receive(int socket, char **buffer, int *size) {
     }
  
     // Handle connection request
-    if (rudp->flags.isSyn == true) {
+    if (rudp->flags.isSyn == 1) {
         printf("Connection request received\n");
         free(rudp);
         return 0;
@@ -151,7 +150,7 @@ int rudp_receive(int socket, char **buffer, int *size) {
     
     // Handle data packet
     if (rudp->sequalNum == seq_number) {
-        if (rudp->sequalNum == 0 && rudp->flags.isData == true) {
+        if (rudp->sequalNum == 0 && rudp->flags.isData == 1) {
             // Set timeout for subsequent data packets
             timeout.tv_sec = 5;  // Set timeout to 5 seconds
             timeout.tv_usec = 0;
@@ -161,7 +160,7 @@ int rudp_receive(int socket, char **buffer, int *size) {
                 return -1;
             }
         }
-        if (rudp->flags.fin == true && rudp->flags.isData == true) {
+        if (rudp->flags.fin == 1 && rudp->flags.isData == 1) {
             *buffer = malloc(rudp->length);
             if (*buffer == NULL) {
                 perror("Failed to allocate memory for buffer");
@@ -181,7 +180,7 @@ int rudp_receive(int socket, char **buffer, int *size) {
             }
             return 5;
         }
-        if (rudp->flags.isData == true) {
+        if (rudp->flags.isData == 1) {
             *buffer = malloc(rudp->length);
             if (*buffer == NULL) {
                 perror("Failed to allocate memory for buffer");
@@ -197,13 +196,13 @@ int rudp_receive(int socket, char **buffer, int *size) {
     }
     
     // Handle invalid packet
-    else if (rudp->flags.isData == true) {
+    else if (rudp->flags.isData == 1) {
         free(rudp);
         return 0;
     }
     
     // Handle connection close
-    if (rudp->flags.fin == true) {
+    if (rudp->flags.fin == 1) {
         free(rudp);
         printf("Connection closed by sender\n");
         // Set timeout for subsequent packets
@@ -219,10 +218,12 @@ int rudp_receive(int socket, char **buffer, int *size) {
             return -1;
         }
         time_t finishing = time(NULL);
+        printf("Waiting for the statictics...\n");
+
         while ((double)(time(NULL) - finishing) < 1) {
             memset(rudp, 0, sizeof(RUDP_Packet));
             recvfrom(socket, rudp, sizeof(RUDP_Packet) - 1, 0, NULL, 0);
-            if (rudp->flags.fin == true) {
+            if (rudp->flags.fin == 1) {
                 if (sending_ack(socket, rudp) == -1) {
                     free(rudp);
                     return -1;
@@ -274,7 +275,7 @@ int rudp_connect(int socket, const char *ip,unsigned short int port) {
         return -1;
     }
     memset(rudp, 0, sizeof(RUDP_Packet));
-    rudp->flags.isSyn = true;
+    rudp->flags.isSyn = 1;
     
     int attempts = 0;
     // Attempt to establish connection with retries
@@ -345,11 +346,11 @@ int rudp_accept(int socket, unsigned short int port) {
         return -1;
     }
     // Send acknowledgment to client
-    if (rudp->flags.isSyn == true) {
+    if (rudp->flags.isSyn == 1) {
         RUDP_Packet *reply = malloc(sizeof(RUDP_Packet));
         memset(reply, 0, sizeof(RUDP_Packet));
-        reply->flags.isSyn = true;
-        reply->flags.ack = true;
+        reply->flags.isSyn = 1;
+        reply->flags.ack = 1;
         int send_res = sendto(socket, reply, sizeof(RUDP_Packet), 0, NULL, 0);
         if (send_res == -1) {
             perror("Failed to send data");
@@ -380,7 +381,7 @@ int rudp_close(int socket) {
         return -1;
     }
     memset(closing_pack, 0, sizeof(RUDP_Packet));
-    closing_pack->flags.fin = true;
+    closing_pack->flags.fin = 1;
     closing_pack->sequalNum = -1;
     closing_pack->checksum = calculate_checksum(closing_pack);
     // Send the closing packet and wait for acknowledgment
@@ -413,7 +414,7 @@ int waiting_ack(int socket, int seq_num, clock_t start_time, clock_t timeout) {
         RUDP_Packet *ack = malloc(sizeof(RUDP_Packet));
         memset(ack, 0, sizeof(RUDP_Packet));
         int recv_res = recvfrom(socket, ack, sizeof(RUDP_Packet), 0, NULL, 0);
-        if (recv_res != -1 && ack->flags.ack == true && ack->sequalNum == seq_num) {
+        if (recv_res != -1 && ack->flags.ack == 1 && ack->sequalNum == seq_num) {
             free(ack);
             return 1;
         }
@@ -430,7 +431,7 @@ int sending_ack(int socket, RUDP_Packet *rudp) {
         return -1;
     }
     memset(ack, 0, sizeof(RUDP_Packet));
-    ack->flags.ack = true;
+    ack->flags.ack = 1;
     ack->sequalNum = rudp->sequalNum;
     ack->checksum = calculate_checksum(ack);
     // Send the acknowledgment packet
