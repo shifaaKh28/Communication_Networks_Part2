@@ -32,8 +32,8 @@ int rudp_socket() {
 }
 int rudp_send(int socket, const char *data, int size) {
     // Calculate the number of packets and size of the last packet
-    int packets = size / MAX_SIZE;
-    int last_pack_size = size % MAX_SIZE;
+    int packets = size / MAX_PACK_SIZE;
+    int last_pack_size = size % MAX_PACK_SIZE;
 
     // Allocate memory for the RUDP packet
     RUDP_Packet *rudp = malloc(sizeof(RUDP_Packet));
@@ -50,8 +50,8 @@ int rudp_send(int socket, const char *data, int size) {
         if (i == packets - 1 && last_pack_size == 0) {
             rudp->flags.fin = 1;
         }
-        memcpy(rudp->data, data + i * MAX_SIZE, MAX_SIZE);
-        rudp->length = MAX_SIZE;
+        memcpy(rudp->data, data + i * MAX_PACK_SIZE, MAX_PACK_SIZE);
+        rudp->length = MAX_PACK_SIZE;
         rudp->checksum = calculate_checksum(rudp);
         
         // Send the packet and wait for acknowledgment
@@ -71,7 +71,7 @@ int rudp_send(int socket, const char *data, int size) {
         rudp->sequalNum = packets;
         rudp->flags.isData = 1;
         rudp->flags.fin = 1;
-        memcpy(rudp->data, data + (packets * MAX_SIZE), last_pack_size);
+        memcpy(rudp->data, data + (packets * MAX_PACK_SIZE), last_pack_size);
         rudp->length = last_pack_size;
         rudp->checksum = calculate_checksum(rudp);
         
