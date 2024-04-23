@@ -11,6 +11,7 @@
 #include <stdbool.h> 
 #include <stddef.h>
 #include <string.h>
+#include <stdint.h>
 
 #define MAX_SIZE 60000  /**< Maximum size for data packets. */
 
@@ -19,10 +20,10 @@
  * @brief Struct to represent the flags in RUDP packets.
  */
 typedef struct Flags {
-  bool fin;        /**< Indicates finishing. */
-  bool ack;   /**< Indicates acknowledgment. */
-  bool isSyn;    /**< Indicates synchronization. */
-  bool isData;      /**< Indicates data packet. */
+  uint8_t fin;        /**< Indicates finishing. */
+  uint8_t ack;   /**< Indicates acknowledgment. */
+  uint8_t isSyn;    /**< Indicates synchronization. */
+  uint8_t isData;      /**< Indicates data packet. */
 }Flags;
 
 /**
@@ -31,8 +32,8 @@ typedef struct Flags {
  */
 typedef struct _RUDP {
   Flags flags;     /**< Flags for the RUDP packet. */
-  int checksum;           /**< Checksum for the packet. */
-  int length;         /**< Length of data in the packet. */
+  uint16_t checksum;           /**< Checksum for the packet. */
+  uint16_t length;         /**< Length of data in the packet. */
   int sequalNum;          /**< Sequence number for the packet. */
   char data[MAX_SIZE];    /**< Data in the packet. */
 } RUDP_Packet;
@@ -100,7 +101,7 @@ int calculate_checksum(RUDP_Packet *rudp);
  * @param timeout Timeout value for waiting.
  * @return 1 if acknowledgment received, 0 if timeout reached, or -1 on error.
  */
-int wait_ack(int socket, int seq_num, clock_t start_time, clock_t timeout);
+int waiting_ack(int socket, int seq_num, clock_t start_time, clock_t timeout);
 
 /**
  * @brief Sends an acknowledgment packet.
@@ -108,6 +109,6 @@ int wait_ack(int socket, int seq_num, clock_t start_time, clock_t timeout);
  * @param rudp Pointer to the RUDP packet for which the acknowledgment is sent.
  * @return 1 on success, or -1 on failure.
  */
-int send_ack(int socket, RUDP_Packet *rudp);
+int sending_ack(int socket, RUDP_Packet *rudp);
 
-#endif   /* RUDP_API_H */
+#endif 
