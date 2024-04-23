@@ -78,7 +78,7 @@ int main(int argc, char *argv[]) {
 
     char option;
     do {
-        printf("Sending the file...\n");
+        printf("start Sending the data...\n");
         if (rudp_send(socket, data, DATA_SIZE) < 0) {
             printf("failed to send the data...\n");
             rudp_close(socket);
