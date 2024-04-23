@@ -12,7 +12,7 @@
 
 #define PORT 1234        // Default port number
 #define IP "127.0.0.1"  // Default server IP address
-#define DATA_SIZE 1024*1024*2 // Size of the random data to generate (2MB)
+#define MAX_SIZE 1024*1024*2 // Size of the random data to generate (2MB)
 
 /**
  * @brief A random data generator function based on srand() and rand().
@@ -60,7 +60,7 @@ int main(int argc, char *argv[]) {
     }
     port_number = (int)input_port;
 
-    char *data = util_generate_random_data(DATA_SIZE);
+    char *data = util_generate_random_data(MAX_SIZE);
 
     // Create a UDP socket and establish a connection with the server
     int socket = rudp_socket();  
@@ -79,7 +79,7 @@ int main(int argc, char *argv[]) {
     char option;
     do {
         printf("start Sending the data...\n");
-        if (rudp_send(socket, data, DATA_SIZE) < 0) {
+        if (rudp_send(socket, data, MAX_SIZE) < 0) {
             printf("failed to send the data...\n");
             rudp_close(socket);
             free(data);
@@ -97,4 +97,3 @@ int main(int argc, char *argv[]) {
 
     return 0;
 }
-
