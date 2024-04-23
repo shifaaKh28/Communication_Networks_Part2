@@ -14,10 +14,15 @@
 
 // Global variable to track the sequence number
 int seq_number = 0;
+
 // Struct to hold server address information
 struct sockaddr_in server_address;
+
 // Struct to hold client address information
 struct sockaddr_in client_address;
+
+//struct Timeout value for socket operations.
+ struct timeval timeout;
 
 int rudp_socket() {
     // Create a new UDP socket
@@ -90,8 +95,6 @@ int rudp_send(int socket, const char *data, int size) {
     return 1;
 }
 
-
-
 int rudp_receive(int socket, char **buffer, int *size) {
     // Allocate memory for the RUDP packet
     RUDP_Packet *rudp = malloc(sizeof(RUDP_Packet));
@@ -101,6 +104,15 @@ int rudp_receive(int socket, char **buffer, int *size) {
     }
     memset(rudp, 0, sizeof(RUDP_Packet));
     
+
+    timeout.tv_sec = 5;  // Set timeout to 5 seconds
+    timeout.tv_usec = 0;
+    if (setsockopt(socket, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0) {
+        perror("Error setting timeout");
+        free(rudp);
+        return -1;
+    }
+
     // Receive packet from socket
     int len = recvfrom(socket, rudp, sizeof(RUDP_Packet) - 1, 0, NULL, 0);
     if (len == -1) {
@@ -108,8 +120,16 @@ int rudp_receive(int socket, char **buffer, int *size) {
         free(rudp);
         return -1;
     }
+
+    // Reset timeout value for the socket
+    timeout.tv_sec = 0;  // Set timeout to 0 seconds
+    timeout.tv_usec = 0;
+    if (setsockopt(socket, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0) {
+        perror("Error resetting timeout");
+        free(rudp);
+        return -1;
+    }
     
-       
     // Send acknowledgment
     if (send_ack(socket, rudp) == -1) {
         free(rudp);
@@ -122,7 +142,6 @@ int rudp_receive(int socket, char **buffer, int *size) {
         return -1;
     }
  
-    
     // Handle connection request
     if (rudp->flags.isSyn == true) {
         printf("Connection request received\n");
@@ -133,7 +152,14 @@ int rudp_receive(int socket, char **buffer, int *size) {
     // Handle data packet
     if (rudp->sequalNum == seq_number) {
         if (rudp->sequalNum == 0 && rudp->flags.isData == true) {
-            set_timeout(socket, 10);
+            // Set timeout for subsequent data packets
+            timeout.tv_sec = 5;  // Set timeout to 5 seconds
+            timeout.tv_usec = 0;
+            if (setsockopt(socket, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0) {
+                perror("Error setting timeout");
+                free(rudp);
+                return -1;
+            }
         }
         if (rudp->flags.fin == true && rudp->flags.isData == true) {
             *buffer = malloc(rudp->length);
@@ -146,7 +172,13 @@ int rudp_receive(int socket, char **buffer, int *size) {
             *size = rudp->length;
             free(rudp);
             seq_number = 0;
-            set_timeout(socket, 10000000);
+            // Reset timeout value for the socket
+            timeout.tv_sec = 0;  // Set timeout to 0 seconds
+            timeout.tv_usec = 0;
+            if (setsockopt(socket, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0) {
+                perror("Error resetting timeout");
+                return -1;
+            }
             return 5;
         }
         if (rudp->flags.isData == true) {
@@ -174,7 +206,13 @@ int rudp_receive(int socket, char **buffer, int *size) {
     if (rudp->flags.fin == true) {
         free(rudp);
         printf("Connection closed by sender\n");
-        set_timeout(socket, 10);
+        // Set timeout for subsequent packets
+        timeout.tv_sec = 5;  // Set timeout to 5 seconds
+        timeout.tv_usec = 0;
+        if (setsockopt(socket, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0) {
+            perror("Error setting timeout");
+            return -1;
+        }
         rudp = malloc(sizeof(RUDP_Packet));
         if (rudp == NULL) {
             perror("Failed to allocate memory for RUDP packet");
@@ -202,25 +240,33 @@ int rudp_receive(int socket, char **buffer, int *size) {
 }
 
 
-int rudp_connect(int socket, const char *ip, int port) {
+int rudp_connect(int socket, const char *ip,unsigned short int port) {
     // Set timeout for socket operations
-    if (set_timeout(socket, 1) == -1) {
+
+    timeout.tv_sec = 1;
+    timeout.tv_usec = 0;
+    if (setsockopt(socket, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0) {
+        perror("Error setting timeout");
         return -1;
     }
-    // Initialize server address structure
+    
     memset(&server_address, 0, sizeof(server_address));
     server_address.sin_family = AF_INET;
     server_address.sin_port = htons(port);
+    
     // Convert IP address from text to binary form
     int val = inet_pton(AF_INET, ip, &server_address.sin_addr);
     if (val <= 0) {
+        perror("Invalid IP address");
         return -1;
     }
+    
     // Connect to the remote socket
     if (connect(socket, (struct sockaddr *)&server_address, sizeof(server_address)) == -1) {
         perror("Connection failed");
         return -1;
     }
+    
     // Send synchronization packet to establish connection
     RUDP_Packet *rudp = malloc(sizeof(RUDP_Packet));
     if (rudp == NULL) {
@@ -229,6 +275,7 @@ int rudp_connect(int socket, const char *ip, int port) {
     }
     memset(rudp, 0, sizeof(RUDP_Packet));
     rudp->flags.isSyn = true;
+    
     int attempts = 0;
     // Attempt to establish connection with retries
     while (attempts < 3) {
@@ -238,14 +285,14 @@ int rudp_connect(int socket, const char *ip, int port) {
             free(rudp);
             return -1;
         }
-        // Wait for acknowledgment packet
-        clock_t start_time = clock();
-        do {
+        // Wait for acknowledgment packet with timeout
+        time_t start_time = time(NULL);
+        while ((time(NULL) - start_time) < 1) {
             RUDP_Packet *recv = malloc(sizeof(RUDP_Packet));
             memset(recv, 0, sizeof(RUDP_Packet));
             int data_received = recvfrom(socket, recv, sizeof(RUDP_Packet), 0, NULL, 0);
             if (data_received == -1) {
-                perror("Failed to receive data");
+                perror("Failed receiving the data");
                 free(rudp);
                 free(recv);
                 return -1;
@@ -259,15 +306,15 @@ int rudp_connect(int socket, const char *ip, int port) {
             } else {
                 printf("Invalid packet received\n");
             }
-        } while ((double)(clock() - start_time) / CLOCKS_PER_SEC < 1);
+        }
         attempts++;
     }
-    printf("Failed to establish connection after multiple attempts\n");
+    printf("Error :Failed to connect after many attempts\n");
     free(rudp);
     return 0;
 }
 
-int rudp_accept(int socket, int port) {
+int rudp_accept(int socket, unsigned short int port) {
     // Initialize server address structure
     memset(&server_address, 0, sizeof(server_address));
     server_address.sin_family = AF_INET;
@@ -280,20 +327,19 @@ int rudp_accept(int socket, int port) {
         close(socket);
         return -1;
     }
-    // Initialize client address structure
-    socklen_t clientaddLen = sizeof(client_address);
+    socklen_t len = sizeof(client_address);
     memset((char *)&client_address, 0, sizeof(client_address));
     // Receive synchronization packet from client
     RUDP_Packet *rudp = malloc(sizeof(RUDP_Packet));
     memset(rudp, 0, sizeof(RUDP_Packet));
-    int recv_length_bytes = recvfrom(socket, rudp, sizeof(RUDP_Packet) - 1, 0, (struct sockaddr *)&client_address, &clientaddLen);
+    int recv_length_bytes = recvfrom(socket, rudp, sizeof(RUDP_Packet) - 1, 0, (struct sockaddr *)&client_address, &len);
     if (recv_length_bytes == -1) {
         perror("Failed to receive data");
         free(rudp);
         return -1;
     }
     // Connect to the client
-    if (connect(socket, (struct sockaddr *)&client_address, clientaddLen) == -1) {
+    if (connect(socket, (struct sockaddr *)&client_address, len) == -1) {
         perror("Connection failed");
         free(rudp);
         return -1;
@@ -312,8 +358,7 @@ int rudp_accept(int socket, int port) {
             return -1;
         }
         // Set timeout for socket operations
-        struct timeval timeout;
-        timeout.tv_sec = 10;
+        timeout.tv_sec = 5;
         timeout.tv_usec = 0;
         if (setsockopt(socket, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0) {
             perror("Error setting timeout");
@@ -342,7 +387,7 @@ int rudp_close(int socket) {
     do {
         int send_result = sendto(socket, closing_pack, sizeof(RUDP_Packet), 0, NULL, 0);
         if (send_result == -1) {
-            perror("Failed to send closing packet");
+            perror("Failed to send the closing packet");
             free(closing_pack);
             return -1;
         }
@@ -399,14 +444,3 @@ int send_ack(int socket, RUDP_Packet *rudp) {
     return 1;
 }
 
-int set_timeout(int socket, int time) {
-    // Set timeout value for the socket
-    struct timeval timeout;
-    timeout.tv_sec = time;
-    timeout.tv_usec = 0;
-    if (setsockopt(socket, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0) {
-        perror("Error setting timeout");
-        return -1;
-    }
-    return 0;
-}
