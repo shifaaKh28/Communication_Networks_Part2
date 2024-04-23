@@ -12,9 +12,6 @@
 #include <time.h>       // For time related functions
 #include <unistd.h>     // For POSIX operating system API
 
-// Global variable to track the sequence number
-int seq_number = 0;
-
 // Struct to hold server address information
 struct sockaddr_in server_address;
 
@@ -66,7 +63,7 @@ int rudp_send(int socket, const char *data, int size) {
                 free(rudp);
                 return -1;
             }
-        } while (wait_ack(socket, i, clock(), 1) <= 0);
+        } while (waiting_ack(socket, i, clock(), 1) <= 0);
     }
     
     // Handle the last packet
@@ -86,7 +83,7 @@ int rudp_send(int socket, const char *data, int size) {
                 free(rudp);
                 return -1;
             }
-        } while (wait_ack(socket, packets, clock(), 1) <= 0);
+        } while (waiting_ack(socket, packets, clock(), 1) <= 0);
     }
     
     // Free the allocated memory for the RUDP packet
@@ -94,6 +91,9 @@ int rudp_send(int socket, const char *data, int size) {
 
     return 1;
 }
+
+// Global variable to track the sequence number
+int seq_number = 0;
 
 int rudp_receive(int socket, char **buffer, int *size) {
     // Allocate memory for the RUDP packet
@@ -131,7 +131,7 @@ int rudp_receive(int socket, char **buffer, int *size) {
     }
     
     // Send acknowledgment
-    if (send_ack(socket, rudp) == -1) {
+    if (sending_ack(socket, rudp) == -1) {
         free(rudp);
         return -1;
     }
@@ -223,7 +223,7 @@ int rudp_receive(int socket, char **buffer, int *size) {
             memset(rudp, 0, sizeof(RUDP_Packet));
             recvfrom(socket, rudp, sizeof(RUDP_Packet) - 1, 0, NULL, 0);
             if (rudp->flags.fin == true) {
-                if (send_ack(socket, rudp) == -1) {
+                if (sending_ack(socket, rudp) == -1) {
                     free(rudp);
                     return -1;
                 }
@@ -391,7 +391,7 @@ int rudp_close(int socket) {
             free(closing_pack);
             return -1;
         }
-    } while (wait_ack(socket, -1, clock(), 1) <= 0);
+    } while (waiting_ack(socket, -1, clock(), 1) <= 0);
     // Close the socket
     close(socket);
     free(closing_pack);
@@ -407,7 +407,7 @@ int calculate_checksum(RUDP_Packet *rudp) {
 }
 
 
-int wait_ack(int socket, int seq_num, clock_t start_time, clock_t timeout) {
+int waiting_ack(int socket, int seq_num, clock_t start_time, clock_t timeout) {
     // Wait for acknowledgment packet within the specified timeout
     while ((double)(clock() - start_time) / CLOCKS_PER_SEC < timeout) {
         RUDP_Packet *ack = malloc(sizeof(RUDP_Packet));
@@ -422,7 +422,7 @@ int wait_ack(int socket, int seq_num, clock_t start_time, clock_t timeout) {
     return 0;
 }
 
-int send_ack(int socket, RUDP_Packet *rudp) {
+int sending_ack(int socket, RUDP_Packet *rudp) {
     // Create an acknowledgment packet
     RUDP_Packet *ack = malloc(sizeof(RUDP_Packet));
     if (ack == NULL) {
