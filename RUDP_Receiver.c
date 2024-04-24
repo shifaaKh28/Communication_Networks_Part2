@@ -88,10 +88,6 @@ int main(int argc, char *argv[]) {
         } else if (data_flag == 1) {
             strcat(total_size, recv_data);  // Append received data to total
         } else if (data_flag == 5) {
-            // Data packet received completely
-            strcat(total_size, recv_data);
-            printf("Received total: %zu\n", sizeof(total_size));
-
             finish = clock();  // Finish timing for data transfer
              //calculates the duration of the process in seconds with fractional precision.
             double elapsed_time = ((double)(finish - start)) / CLOCKS_PER_SEC;
