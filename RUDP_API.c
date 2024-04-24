@@ -1,5 +1,9 @@
-#include "RUDP_API.h"
 
+/**
+ * Wasim
+ * Shifaa
+*/
+#include "RUDP_API.h"
 #include <arpa/inet.h>  // For functions like inet_pton
 #include <errno.h>      // For error handling
 #include <stdio.h>      // For standard I/O operations
@@ -75,15 +79,14 @@ int rudp_send(int socket, const char *data, int size) {
         memcpy(rudp->data, data + (packets * MAX_PACK_SIZE), last_pack_size);
         rudp->length = last_pack_size;
         rudp->checksum = calculate_checksum(rudp);
-        
-        do {
+        while (waiting_ack(socket, packets, clock(), 1) <= 0) {
             int last_pack = sendto(socket, rudp, sizeof(RUDP_Packet), 0, NULL, 0);
             if (last_pack == -1) {
                 perror("can't send the last packet");
                 free(rudp);
                 return -1;
             }
-        } while (waiting_ack(socket, packets, clock(), 1) <= 0);
+        }
     }
     
     // Free the allocated memory for the RUDP packet
@@ -114,8 +117,7 @@ int rudp_receive(int socket, char **buffer, int *size) {
     }
 
     // Receive packet from socket
-    int len = recvfrom(socket, rudp, sizeof(RUDP_Packet) - 1, 0, NULL, 0);
-    if (len == -1) {
+    if (recvfrom(socket, rudp, sizeof(RUDP_Packet) - 1, 0, NULL, 0) == -1) {
         perror("Failed to receive data");
         free(rudp);
         return -1;
@@ -277,7 +279,7 @@ int rudp_connect(int socket, const char *ip,unsigned short int port) {
     }
     memset(rudp, 0, sizeof(RUDP_Packet));
     rudp->flags.isSyn = 1;
-    
+
     int attempts = 0;
     // Attempt to establish connection with retries
     while (attempts < 3) {
@@ -292,8 +294,7 @@ int rudp_connect(int socket, const char *ip,unsigned short int port) {
         while ((time(NULL) - start_time) < 1) {
             RUDP_Packet *recv = malloc(sizeof(RUDP_Packet));
             memset(recv, 0, sizeof(RUDP_Packet));
-            int data_received = recvfrom(socket, recv, sizeof(RUDP_Packet), 0, NULL, 0);
-            if (data_received == -1) {
+            if (recvfrom(socket, recv, sizeof(RUDP_Packet), 0, NULL, 0) == -1) {
                 perror("Failed receiving the data");
                 free(rudp);
                 free(recv);
@@ -323,8 +324,7 @@ int rudp_accept(int socket, unsigned short int port) {
     server_address.sin_port = htons(port);
     server_address.sin_addr.s_addr = htonl(INADDR_ANY);
     // Bind the socket to the specified port
-    int bind_res = bind(socket, (struct sockaddr *)&server_address, sizeof(server_address));
-    if (bind_res == -1) {
+    if (bind(socket, (struct sockaddr *)&server_address, sizeof(server_address)) == -1) {
         perror("Binding failed");
         close(socket);
         return -1;
@@ -334,8 +334,7 @@ int rudp_accept(int socket, unsigned short int port) {
     // Receive synchronization packet from client
     RUDP_Packet *rudp = malloc(sizeof(RUDP_Packet));
     memset(rudp, 0, sizeof(RUDP_Packet));
-    int recv_length_bytes = recvfrom(socket, rudp, sizeof(RUDP_Packet) - 1, 0, (struct sockaddr *)&client_address, &len);
-    if (recv_length_bytes == -1) {
+    if (recvfrom(socket, rudp, sizeof(RUDP_Packet) - 1, 0, (struct sockaddr *)&client_address, &len) == -1) {
         perror("Failed to receive data");
         free(rudp);
         return -1;
@@ -375,22 +374,24 @@ int rudp_accept(int socket, unsigned short int port) {
 
 
 int rudp_close(int socket) {
-  RUDP_Packet *close_socket = (RUDP_Packet*) malloc(sizeof(RUDP_Packet));
-  memset(close_socket, 0, sizeof(rudp_socket));
-  close_socket->flags.fin = 1;  // Finished so closing the connection
-  close_socket->sequalNum = -1;
-  close_socket->checksum = calculate_checksum(close_socket);
-
+  RUDP_Packet *temp = (RUDP_Packet*) malloc(sizeof(RUDP_Packet));
+  if (temp == NULL){
+    perror("failed to allocate memory for closing socket");
+    return -1;
+  }
+  memset(temp, 0, sizeof(RUDP_Packet));
+  temp->flags.fin = 1;  // Finished so closing the connection
+  temp->checksum = calculate_checksum(temp);
+  temp->sequalNum = -1;
   while (waiting_ack(socket, -1, clock(), 1) <= 0) {
-    int res_send = sendto(socket, close_socket, sizeof(RUDP_Packet), 0, NULL, 0);
-    if (res_send == -1) {
+    if (sendto(socket, temp, sizeof(RUDP_Packet), 0, NULL, 0) == -1) {
       perror("Fialed sendto when closing");
-      free(close_socket);
+      free(temp);
       return -1;  // for error
     }
   }
   close(socket);
-  free(close_socket);
+  free(temp);
   return 1;  // succeeded to close the socket and freeing our rudp struct
 }
 
@@ -404,22 +405,23 @@ int calculate_checksum(RUDP_Packet *rudp) {
 
 
 int waiting_ack(int socket, int sequal_num, clock_t s, clock_t t) {
-  RUDP_Packet *reply = (RUDP_Packet*) malloc(sizeof(RUDP_Packet));
+  RUDP_Packet *temp = (RUDP_Packet*) malloc(sizeof(RUDP_Packet));
+  if (temp == NULL){
+    fprintf(stderr, "error allocating memory for sending ack");
+    return -1;
+  }
   while ((double)(clock() - s) / CLOCKS_PER_SEC < 1) {
-    int length_recv = recvfrom(socket, reply, sizeof(RUDP_Packet) - 1, 0, NULL, 0);
-    if (length_recv == -1) {
-      free(reply);
-      return -1;  // for errror
+    if (recvfrom(socket, temp, sizeof(RUDP_Packet) - 1, 0, NULL, 0) == -1) {
+      free(temp);
+      return -1;
     }
-    if (reply->sequalNum == sequal_num &&
-        reply->flags.ack ==
-            1) {  // meaning this is the packet we're wating for
-      free(reply);
+    if (temp->sequalNum == sequal_num && temp->flags.ack) {
+      free(temp);
       return 1;
     }
   }
-  free(reply);
-  return 03;  // for unsuccess
+  free(temp);
+  return -1;
 }
 
 
@@ -432,11 +434,10 @@ int sending_ack(int socket, RUDP_Packet *rudp) {
     }
     memset(ack, 0, sizeof(RUDP_Packet));
     ack->flags.ack = 1;
-    ack->sequalNum = rudp->sequalNum;
     ack->checksum = calculate_checksum(ack);
+    ack->sequalNum = rudp->sequalNum;
     // Send the acknowledgment packet
-    int send_res = sendto(socket, ack, sizeof(RUDP_Packet), 0, NULL, 0);
-    if (send_res == -1) {
+    if (sendto(socket, ack, sizeof(RUDP_Packet), 0, NULL, 0) == -1) {
         perror("Error: Failed end ack");
         free(ack);
         return -1;
