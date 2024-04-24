@@ -30,6 +30,7 @@ int rudp_socket() {
     }
     return sockfd;
 }
+
 int rudp_send(int socket, const char *data, int size) {
     // Calculate the number of packets and size of the last packet
     int packets = size / MAX_PACK_SIZE;
@@ -152,7 +153,7 @@ int rudp_receive(int socket, char **buffer, int *size) {
     if (rudp->sequalNum == seq_number) {
         if (rudp->sequalNum == 0 && rudp->flags.isData == 1) {
             // Set timeout for subsequent data packets
-            timeout.tv_sec = 5;  // Set timeout to 5 seconds
+            timeout.tv_sec = 1;  // Set timeout to 5 seconds
             timeout.tv_usec = 0;
             if (setsockopt(socket, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0) {
                 perror("Error setting timeout");
@@ -374,29 +375,23 @@ int rudp_accept(int socket, unsigned short int port) {
 
 
 int rudp_close(int socket) {
-    // Create a closing packet
-    RUDP_Packet *closing_pack = malloc(sizeof(RUDP_Packet));
-    if (closing_pack == NULL) {
-        perror("Failed to allocate memory for closing packet");
-        return -1;
+  RUDP_Packet *close_socket = (RUDP_Packet*) malloc(sizeof(RUDP_Packet));
+  memset(close_socket, 0, sizeof(rudp_socket));
+  close_socket->flags.fin = 1;  // Finished so closing the connection
+  close_socket->sequalNum = -1;
+  close_socket->checksum = calculate_checksum(close_socket);
+
+  while (waiting_ack(socket, -1, clock(), 1) <= 0) {
+    int res_send = sendto(socket, close_socket, sizeof(RUDP_Packet), 0, NULL, 0);
+    if (res_send == -1) {
+      perror("Fialed sendto when closing");
+      free(close_socket);
+      return -1;  // for error
     }
-    memset(closing_pack, 0, sizeof(RUDP_Packet));
-    closing_pack->flags.fin = 1;
-    closing_pack->sequalNum = -1;
-    closing_pack->checksum = calculate_checksum(closing_pack);
-    // Send the closing packet and wait for acknowledgment
-    do {
-        int send_result = sendto(socket, closing_pack, sizeof(RUDP_Packet), 0, NULL, 0);
-        if (send_result == -1) {
-            perror("Failed to send the closing packet");
-            free(closing_pack);
-            return -1;
-        }
-    } while (waiting_ack(socket, -1, clock(), 1) <= 0);
-    // Close the socket
-    close(socket);
-    free(closing_pack);
-    return 0;
+  }
+  close(socket);
+  free(close_socket);
+  return 1;  // succeeded to close the socket and freeing our rudp struct
 }
 
 
@@ -408,20 +403,25 @@ int calculate_checksum(RUDP_Packet *rudp) {
 }
 
 
-int waiting_ack(int socket, int seq_num, clock_t start_time, clock_t timeout) {
-    // Wait for acknowledgment packet within the specified timeout
-    while ((double)(clock() - start_time) / CLOCKS_PER_SEC < timeout) {
-        RUDP_Packet *ack = malloc(sizeof(RUDP_Packet));
-        memset(ack, 0, sizeof(RUDP_Packet));
-        int recv_res = recvfrom(socket, ack, sizeof(RUDP_Packet), 0, NULL, 0);
-        if (recv_res != -1 && ack->flags.ack == 1 && ack->sequalNum == seq_num) {
-            free(ack);
-            return 1;
-        }
-        free(ack);
+int waiting_ack(int socket, int sequal_num, clock_t s, clock_t t) {
+  RUDP_Packet *reply = (RUDP_Packet*) malloc(sizeof(RUDP_Packet));
+  while ((double)(clock() - s) / CLOCKS_PER_SEC < 1) {
+    int length_recv = recvfrom(socket, reply, sizeof(RUDP_Packet) - 1, 0, NULL, 0);
+    if (length_recv == -1) {
+      free(reply);
+      return -1;  // for errror
     }
-    return 0;
+    if (reply->sequalNum == sequal_num &&
+        reply->flags.ack ==
+            1) {  // meaning this is the packet we're wating for
+      free(reply);
+      return 1;
+    }
+  }
+  free(reply);
+  return 03;  // for unsuccess
 }
+
 
 int sending_ack(int socket, RUDP_Packet *rudp) {
     // Create an acknowledgment packet
@@ -444,4 +444,3 @@ int sending_ack(int socket, RUDP_Packet *rudp) {
     free(ack);
     return 1;
 }
-
