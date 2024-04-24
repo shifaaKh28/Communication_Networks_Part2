@@ -12,7 +12,7 @@
 #include <string.h>
 #include <stdint.h>
 
-#define MAX_PACK_SIZE 60000  /**< Maximum size for data packets. */
+#define MAX_PACK_SIZE 4000  /**< Maximum size for data packets. */
 
 /**
  * @struct Flags
